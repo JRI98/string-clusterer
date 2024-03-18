@@ -13,8 +13,9 @@ go get github.com/JRI98/string-clusterer
 ## Example
 
 ```golang
+clusterer := NewClusterer()
 input := []string{"apple", "aple", "banana", "bananna", "orange", "ornge"}
-result := Cluster(input, NewJaroWinkler(false), 0.9, 1)
+result := clusterer.Cluster(input)
 fmt.Println(result) // [[apple aple] [banana bananna] [orange ornge]]
 ```
 

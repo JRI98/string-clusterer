@@ -22,13 +22,49 @@ func traverse(node *btreeNode, groups [][]string) [][]string {
 	return groups
 }
 
+type Clusterer struct {
+	similarityMetric SimilarityMetric
+	threshold        float64
+	iterations       uint64
+}
+
+func NewClusterer(options ...func(*Clusterer)) *Clusterer {
+	clusterer := &Clusterer{
+		similarityMetric: NewJaroWinkler(false),
+		threshold:        0.9,
+		iterations:       1,
+	}
+	for _, option := range options {
+		option(clusterer)
+	}
+	return clusterer
+}
+
+func WithSimilarityMetric(similarityMetric SimilarityMetric) func(*Clusterer) {
+	return func(s *Clusterer) {
+		s.similarityMetric = similarityMetric
+	}
+}
+
+func WithThreshold(threshold float64) func(*Clusterer) {
+	return func(s *Clusterer) {
+		s.threshold = threshold
+	}
+}
+
+func WithIterations(iterations uint64) func(*Clusterer) {
+	return func(s *Clusterer) {
+		s.iterations = iterations
+	}
+}
+
 // SimilarityMetric represents a metric for measuring the similarity between strings.
 type SimilarityMetric interface {
 	Compare(a, b string) float64
 }
 
 // Cluster groups a slice of strings according to a similarity metric and a threshold.
-func Cluster(inputStrings []string, similarityMetric SimilarityMetric, threshold float64, iterations uint64) [][]string {
+func (clusterer Clusterer) Cluster(inputStrings []string) [][]string {
 	if len(inputStrings) == 0 {
 		return [][]string{}
 	}
@@ -38,7 +74,7 @@ func Cluster(inputStrings []string, similarityMetric SimilarityMetric, threshold
 		result[i] = []string{v}
 	}
 
-	for range iterations {
+	for range clusterer.iterations {
 		bTree := &btreeNode{nil, nil, result[0]}
 
 		for _, cluster := range result[1:] {
@@ -46,8 +82,8 @@ func Cluster(inputStrings []string, similarityMetric SimilarityMetric, threshold
 			node := bTree
 			for {
 				nodeHead := node.values[0]
-				similarity := similarityMetric.Compare(inputHead, nodeHead)
-				if similarity >= threshold {
+				similarity := clusterer.similarityMetric.Compare(inputHead, nodeHead)
+				if similarity >= clusterer.threshold {
 					node.values = append(node.values, cluster...)
 					break
 				}
@@ -58,10 +94,10 @@ func Cluster(inputStrings []string, similarityMetric SimilarityMetric, threshold
 				}
 
 				leftHead := node.left.values[0]
-				leftSimilarity := similarityMetric.Compare(inputHead, leftHead)
+				leftSimilarity := clusterer.similarityMetric.Compare(inputHead, leftHead)
 
 				if node.right == nil {
-					if leftSimilarity >= threshold {
+					if leftSimilarity >= clusterer.threshold {
 						node.left.values = append(node.left.values, cluster...)
 						break
 					} else {
@@ -71,16 +107,16 @@ func Cluster(inputStrings []string, similarityMetric SimilarityMetric, threshold
 				}
 
 				rightHead := node.right.values[0]
-				rightSimilarity := similarityMetric.Compare(inputHead, rightHead)
+				rightSimilarity := clusterer.similarityMetric.Compare(inputHead, rightHead)
 
 				if leftSimilarity >= rightSimilarity {
-					if leftSimilarity >= threshold {
+					if leftSimilarity >= clusterer.threshold {
 						node.left.values = append(node.left.values, cluster...)
 						break
 					}
 					node = node.left
 				} else {
-					if rightSimilarity >= threshold {
+					if rightSimilarity >= clusterer.threshold {
 						node.right.values = append(node.right.values, cluster...)
 						break
 					}

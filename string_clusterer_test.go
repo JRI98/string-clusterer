@@ -10,18 +10,16 @@ import (
 func TestCluster(t *testing.T) {
 	testcases := []struct {
 		inputs       []string
-		metric       SimilarityMetric
-		threshold    float64
-		iterations   uint64
+		clusterer    *Clusterer
 		wantClusters int
 	}{
-		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewJaroWinkler(false), 0.9, 1, 3},
-		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewJaroWinkler(false), 0, 1, 1},
-		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewJaroWinkler(false), 1, 1, 6},
+		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewClusterer(WithThreshold(0.9)), 3},
+		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewClusterer(WithThreshold(0)), 1},
+		{[]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewClusterer(WithThreshold(1)), 6},
 	}
 
 	for _, tc := range testcases {
-		result := Cluster(tc.inputs, tc.metric, tc.threshold, tc.iterations)
+		result := tc.clusterer.Cluster(tc.inputs)
 
 		if len(result) != tc.wantClusters {
 			t.Fatalf("%q clusters, want %q clusters", result, tc.wantClusters)
@@ -46,7 +44,7 @@ func TestCluster(t *testing.T) {
 }
 
 func FuzzCluster(f *testing.F) {
-	metric := NewJaroWinkler(false)
+	metricOption := WithSimilarityMetric(NewJaroWinkler(false))
 
 	f.Fuzz(func(t *testing.T, inputString string, threshold float64, iterations uint64) {
 		inputs := strings.Fields(inputString)
@@ -54,7 +52,8 @@ func FuzzCluster(f *testing.F) {
 			return
 		}
 
-		result := Cluster(inputs, metric, threshold, iterations)
+		clusterer := NewClusterer(WithThreshold(threshold), metricOption, WithIterations(iterations))
+		result := clusterer.Cluster(inputs)
 
 		if len(result) == 0 {
 			t.Fatal("result len is never 0")
@@ -78,7 +77,8 @@ func FuzzCluster(f *testing.F) {
 }
 
 func BenchmarkCluster(b *testing.B) {
+	clusterer := NewClusterer(WithThreshold(0.9))
 	for i := 0; i < b.N; i++ {
-		Cluster([]string{"apple", "aple", "banana", "bananna", "orange", "ornge"}, NewJaroWinkler(false), 0.9, 1)
+		clusterer.Cluster([]string{"apple", "aple", "banana", "bananna", "orange", "ornge"})
 	}
 }
